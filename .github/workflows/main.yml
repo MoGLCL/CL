@@ -1,0 +1,45 @@
+name: Medo-X-LiteManager
+
+on:
+  workflow_dispatch:
+    inputs:
+      referral_link:
+        description: 'Enter your referral link'
+        required: true
+      thread_count:
+        description: 'Enter the number of concurrent threads (e.g., 3)'
+        required: true
+        default: '3'
+      email_domain:
+        description: 'Enter the email domain for account generation (e.g., medomail.com)'
+        required: true
+        default: 'medomail.com'
+
+jobs:
+  build:
+    name: Start Building...
+    runs-on: windows-2019
+    timeout-minutes: 9999
+    
+    steps:
+      - name: Downloading & Installing Essentials
+        run: |
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MedoGhnam/SWS/refs/heads/main/Downloads.bat" -OutFile "Downloads.bat"
+          cmd /c Downloads.bat
+
+      - name: Starting RDP
+        run: cmd /c show.bat
+
+      - name: Saving Configuration to config.txt
+        run: |
+          echo referral_link=${{ github.event.inputs.referral_link }} > C:\Users\Public\Desktop\sws\config.txt
+          echo thread_count=${{ github.event.inputs.thread_count }} >> C:\Users\Public\Desktop\sws\config.txt
+          echo email_domain=${{ github.event.inputs.email_domain }} >> C:\Users\Public\Desktop\sws\config.txt
+
+      - name: Running Start.bat
+        run: |
+          cd C:\Users\Public\Desktop\sws
+          cmd /c Start.bat > nul 2>&1
+
+      - name: Medo Says Enjoy ;)
+        run: cmd /c loop.bat
