@@ -1,4 +1,4 @@
-name: CL Ultra
+name: Run Account Creation Script
 
 on:
   push:
@@ -39,12 +39,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          
-         pip install requests beautifulsoup4
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4
 
       - name: Download script
         run: |
-          curl -o script.py https://raw.githubusercontent.com/MoGLCL/CL/refs/heads/main/4.py
+          curl -o script.py https://raw.githubusercontent.com/MoGLCL/CL/main/4.py
 
       - name: Run script
         env:
@@ -57,8 +57,6 @@ jobs:
           python script.py
 
       - name: Upload accounts.txt to Discord webhook
-        if: success() && fileExists('accounts.txt')
+        if: success() && exists('accounts.txt')
         run: |
           curl -F "file=@accounts.txt" ${{ secrets.DISCORD_WEBHOOK }}
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
