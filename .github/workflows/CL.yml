@@ -1,237 +1,71 @@
-import requests
-from bs4 import BeautifulSoup
-import random
-import string
-import time
-import threading
-import queue
-import os
+name: Run Account Creation Script
 
-def generate_random_email():
-    return ''.join(random.choices(string.ascii_lowercase, k=8)) + "@gmail.com"
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ref_code:
+        description: 'Referral code (e.g., ORiUKq12r4gnUd8F)'
+        required: true
+      account_count:
+        description: 'Number of accounts to create'
+        required: true
+        type: number
+      max_threads:
+        description: 'Number of threads (1-20 recommended)'
+        required: true
+        type: number
+      delete_accounts:
+        description: 'Delete created accounts? (yes/no)'
+        required: true
+        type: choice
+        options:
+          - yes
+          - no
 
-def generate_password():
-    chars = string.ascii_letters + string.digits + "!@#$%^&*()_+"
-    while True:
-        password = ''.join(random.choices(chars, k=12))
-        if (any(c.islower() for c in password) and
-            any(c.isupper() for c in password) and
-            any(c.isdigit() for c in password)):
-            return password
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-def create_account(ref_code, result_queue, index):
-    try:
-        session = requests.Session()
-        ref_link = f"https://gamersunivers.com/?ref={ref_code}"
-        session.get(ref_link, timeout=5)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-        register_page = session.get("https://gamersunivers.com/page/register.html", timeout=5)
-        soup = BeautifulSoup(register_page.text, "html.parser")
-        token = soup.find("input", {"id": "regToken"})["value"]
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4
 
-        email = generate_random_email()
-        password = generate_password()
+      - name: Download script
+        run: |
+          curl -o script.py https://raw.githubusercontent.com/MoGLCL/CL/main/4.py
 
-        payload = {
-            "a": "register",
-            "token": token,
-            "email": email,
-            "password": password,
-            "password2": password,
-            "tos": "true",
-            "recaptcha": None
-        }
+      - name: Run script
+        env:
+          REF_CODE: ${{ github.event.inputs.ref_code || secrets.REF_CODE }}
+          ACCOUNT_COUNT: ${{ github.event.inputs.account_count || secrets.ACCOUNT_COUNT }}
+          MAX_THREADS: ${{ github.event.inputs.max_threads || secrets.MAX_THREADS }}
+          DELETE_ACCOUNTS: ${{ github.event.inputs.delete_accounts || secrets.DELETE_ACCOUNTS }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          python script.py
 
-        headers = {
-            "Referer": ref_link,
-            "X-Requested-With": "XMLHttpRequest"
-        }
+      - name: Check if accounts.txt exists
+        id: check-file
+        run: |
+          if [ -f accounts.txt ]; then
+            echo "file_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "file_exists=false" >> $GITHUB_OUTPUT
+          fi
 
-        session.post("https://gamersunivers.com/system/ajax.php", data=payload, headers=headers, timeout=5)
-
-        result_queue.put({
-            "status": "success",
-            "email": email,
-            "password": password,
-            "session": session,
-            "index": index
-        })
-
-    except Exception as e:
-        result_queue.put({
-            "status": "error",
-            "error": str(e),
-            "index": index
-        })
-
-def delete_account(session, password, result_queue, index):
-    try:
-        del_payload = {
-            "password": password,
-            "del_acc": "Delete"
-        }
-
-        del_headers = {
-            "Referer": "https://gamersunivers.com/page/account.html",
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
-
-        del_resp = session.post("https://gamersunivers.com/page/account.html", data=del_payload, headers=del_headers, timeout=5)
-
-        result_queue.put({
-            "status": "success" if del_resp.status_code in [200, 302] else "error",
-            "status_code": del_resp.status_code if del_resp.status_code not in [200, 302] else None,
-            "index": index
-        })
-
-    except Exception as e:
-        result_queue.put({
-            "status": "error",
-            "error": str(e),
-            "index": index
-        })
-
-def send_to_webhook(webhook_url, file_path):
-    try:
-        if not os.path.exists(file_path):
-            print(f"❌ Error: {file_path} does not exist.")
-            return
-
-        with open(file_path, "rb") as file:
-            files = {
-                "file": (file_path, file, "text/plain")
-            }
-            response = requests.post(webhook_url, files=files, timeout=10)
-
-        if response.status_code == 200 or response.status_code == 204:
-            print("📤 accounts.txt sent to Discord webhook successfully.")
-        else:
-            print(f"❌ Failed to send accounts.txt to webhook (Status: {response.status_code})")
-
-    except Exception as e:
-        print(f"❌ Error sending file to webhook: {str(e)}")
-
-def main():
-    webhook_url = os.getenv("DISCORD_WEBHOOK", "https://discord.com/api/webhooks/1393161594707513354/JwURmSERnHSevTZk88pNQpbPQDELkv9PBYUm9F1tUtaBEfGq9KzgS2IT-kcjgqDbhUC5")
-    ref_code = os.getenv("REF_CODE")
-    
-    # Validate ACCOUNT_COUNT
-    account_count_str = os.getenv("ACCOUNT_COUNT", "1")
-    try:
-        account_count = int(account_count_str)
-        if account_count <= 0:
-            raise ValueError("ACCOUNT_COUNT must be a positive integer")
-    except ValueError:
-        print(f"❌ Error: Invalid ACCOUNT_COUNT value '{account_count_str}'. Must be a positive integer.")
-        return
-
-    # Validate MAX_THREADS
-    max_threads_str = os.getenv("MAX_THREADS", "1")
-    try:
-        max_threads = int(max_threads_str)
-        if max_threads <= 0:
-            raise ValueError("MAX_THREADS must be a positive integer")
-    except ValueError:
-        print(f"❌ Error: Invalid MAX_THREADS value '{max_threads_str}'. Must be a positive integer.")
-        return
-
-    delete_option = os.getenv("DELETE_ACCOUNTS", "no").lower()
-
-    if not ref_code:
-        print("❌ Error: REF_CODE environment variable is required.")
-        return
-
-    max_threads = min(max(account_count, 1), max_threads, 20)  # Cap at 20 to avoid server issues
-
-    created_accounts = []
-    result_queue = queue.Queue()
-    start_time = time.time()
-
-    # Account creation
-    threads = []
-    for i in range(account_count):
-        thread = threading.Thread(target=create_account, args=(ref_code, result_queue, i))
-        threads.append(thread)
-        thread.start()
-
-        if len(threads) >= max_threads:
-            for t in threads:
-                t.join()
-            threads = []
-
-    for t in threads:
-        t.join()
-
-    with open("accounts.txt", "a", encoding="utf-8") as file:
-        results = [result_queue.get() for _ in range(account_count)]
-        results.sort(key=lambda x: x["index"])  # Sort by index
-
-        for result in results:
-            idx = result["index"]
-            if result["status"] == "success":
-                email = result["email"]
-                password = result["password"]
-                print(f"[{idx+1}] ✅ Account created: {email}")
-                file.write(f"{email}:{password}\n")
-                created_accounts.append({
-                    "session": result["session"],
-                    "password": password
-                })
-            else:
-                print(f"[{idx+1}] ❌ Error: {result['error']}")
-
-    end_time = time.time()
-    print(f"\n✅ Created {len(created_accounts)} accounts in {round(end_time - start_time, 2)} seconds.")
-    print("📁 Saved to accounts.txt")
-
-    # Send accounts.txt to webhook
-    send_to_webhook(webhook_url, "accounts.txt")
-
-    # Account deletion
-    if delete_option == "yes":
-        delete_queue = queue.Queue()
-        delete_start_time = time.time()
-        threads = []
-
-        for i, acc in enumerate(created_accounts):
-            thread = threading.Thread(target=delete_account, args=(acc["session"], acc["password"], delete_queue, i))
-            threads.append(thread)
-            thread.start()
-
-            if len(threads) >= max_threads:
-                for t in threads:
-                    t.join()
-                threads = []
-
-        for t in threads:
-            t.join()
-
-        delete_results = [delete_queue.get() for _ in range(len(created_accounts))]
-        delete_results.sort(key=lambda x: x["index"])  # Sort by index
-
-        for result in delete_results:
-            idx = result["index"]
-            if result["status"] == "success":
-                print(f"[{idx+1}] 🗑️ Account deleted.")
-            else:
-                error_msg = result.get("error", f"Status: {result['status_code']}")
-                print(f"[{idx+1}] ❌ Failed to delete ({error_msg})")
-
-        delete_end_time = time.time()
-        print(f"\n🗑️ Deleted accounts in {round(delete_end_time - delete_start_time, 2)} seconds.")
-
-if __name__ == "__main__":
-   print(r"""
- ▄████▄   ██▓           █    ██  ██▓  ▄▄▄█████▓ ██▀███   ▄▄▄      
-▒██▀ ▀█  ▓██▒           ██  ▓██▒▓██▒  ▓  ██▒ ▓▒▓██ ▒ ██▒▒████▄    
-▒▓█    ▄ ▒██░          ▓██  ▒██░▒██░  ▒ ▓██░ ▒░▓██ ░▄█ ▒▒██  ▀█▄  
-▒▓▓▄ ▄██▒▒██░          ▓▓█  ░██░▒██░  ░ ▓██▓ ░ ▒██▀▀█▄  ░██▄▄▄▄██ 
-▒ ▓███▀ ░░██████▒      ▒▒█████▓ ░██████▒▒██▒ ░ ░██▓ ▒██▒ ▓█   ▓██▒
-░ ░▒ ▒  ░░ ▒░▓  ░      ░▒▓▒ ▒ ▒ ░ ▒░▓  ░▒ ░░   ░ ▒▓ ░▒▓░ ▒▒   ▓▒█░
-  ░  ▒   ░ ░ ▒  ░      ░░▒░ ░ ░ ░ ░ ▒  ░  ░      ░▒ ░ ▒░  ▒   ▒▒ ░
-░          ░ ░          ░░░ ░ ░   ░ ░   ░        ░░   ░   ░   ▒   
-░ ░          ░  ░         ░         ░  ░          ░           ░  ░
-░                                                                 
-      By MoGlitch & Wazer (Code Luck Team ❤)
-""")
-    main()
+      - name: Upload accounts.txt to Discord webhook
+        if: success() && steps.check-file.outputs.file_exists == 'true'
+        run: |
+          curl -F "file=@accounts.txt" ${{ secrets.DISCORD_WEBHOOK }}
