@@ -56,7 +56,16 @@ jobs:
         run: |
           python script.py
 
+      - name: Check if accounts.txt exists
+        id: check-file
+        run: |
+          if [ -f accounts.txt ]; then
+            echo "file_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "file_exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Upload accounts.txt to Discord webhook
-        if: success() && exists('accounts.txt')
+        if: success() && steps.check-file.outputs.file_exists == 'true'
         run: |
           curl -F "file=@accounts.txt" ${{ secrets.DISCORD_WEBHOOK }}
