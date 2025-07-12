@@ -1,0 +1,64 @@
+name: CL Ultra
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ref_code:
+        description: 'Referral code (e.g., ORiUKq12r4gnUd8F)'
+        required: true
+      account_count:
+        description: 'Number of accounts to create'
+        required: true
+        type: number
+      max_threads:
+        description: 'Number of threads (1-20 recommended)'
+        required: true
+        type: number
+      delete_accounts:
+        description: 'Delete created accounts? (yes/no)'
+        required: true
+        type: choice
+        options:
+          - yes
+          - no
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          
+         pip install requests beautifulsoup4
+
+      - name: Download script
+        run: |
+          curl -o script.py https://raw.githubusercontent.com/MoGLCL/CL/refs/heads/main/4.py
+
+      - name: Run script
+        env:
+          REF_CODE: ${{ github.event.inputs.ref_code || secrets.REF_CODE }}
+          ACCOUNT_COUNT: ${{ github.event.inputs.account_count || secrets.ACCOUNT_COUNT }}
+          MAX_THREADS: ${{ github.event.inputs.max_threads || secrets.MAX_THREADS }}
+          DELETE_ACCOUNTS: ${{ github.event.inputs.delete_accounts || secrets.DELETE_ACCOUNTS }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          python script.py
+
+      - name: Upload accounts.txt to Discord webhook
+        if: success() && fileExists('accounts.txt')
+        run: |
+          curl -F "file=@accounts.txt" ${{ secrets.DISCORD_WEBHOOK }}
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
