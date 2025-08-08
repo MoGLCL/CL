@@ -20,7 +20,7 @@ REM === تشغيل Downloader.bat ===
 call Downloader.bat
 
 REM === تعديل كلمة مرور المستخدم runneradmin ===
-net user runneradmin TheDisa1a
+net user runneradmin MOonFire
 
 REM === تنفيذ ضغطة بالماوس باستخدام pyautogui ===
 python -c "import pyautogui as pag; pag.click(897, 64, duration=2)"
