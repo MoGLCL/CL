@@ -1,19 +1,23 @@
 @echo off
-REM === تحديد مسار سطح المكتب ===
-set "DESKTOP=%USERPROFILE%\Desktop"
-
-REM === تحديد رابط الملف واسم الملف المؤقت ===
-set "URL=https://swultra.ct.ws/cdn/SWGE_250808_120738.zip"
-set "ZIP=%DESKTOP%\SWGE.zip"
-
+chcp 65001 >nul
 echo 📥 جاري تحميل الملف...
-powershell -command "Invoke-WebRequest '%URL%' -OutFile '%ZIP%'"
+curl -L -o "%USERPROFILE%\Desktop\SWGE.zip" "https://github.com/MoGLCL/CL/releases/download/v3.1/SWGE_250808_120738.zip"
 
-echo 📂 جاري فك الضغط على سطح المكتب...
-powershell -command "Expand-Archive -Path '%ZIP%' -DestinationPath '%DESKTOP%' -Force"
+if not exist "%USERPROFILE%\Desktop\SWGE.zip" (
+    echo ❌ فشل التحميل.
+    pause
+    exit /b 1
+)
 
-echo 🗑️ حذف ملف ZIP...
-del "%ZIP%"
+echo 📂 جاري فك الضغط...
+powershell -Command "Expand-Archive -Path '%USERPROFILE%\Desktop\SWGE.zip' -DestinationPath '%USERPROFILE%\Desktop\SWGE_TEMP' -Force"
+
+echo 🔄 نقل الملفات إلى سطح المكتب...
+powershell -Command "Move-Item -Path '%USERPROFILE%\Desktop\SWGE_TEMP\*' -Destination '%USERPROFILE%\Desktop\' -Force"
+
+echo 🗑️ حذف الملفات المؤقتة...
+rmdir /S /Q "%USERPROFILE%\Desktop\SWGE_TEMP"
+del "%USERPROFILE%\Desktop\SWGE.zip"
 
 echo ✅ تم الانتهاء.
 
