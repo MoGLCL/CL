@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo 📥 جاري تحميل الملف...
-curl -L -o "%USERPROFILE%\Desktop\SWGE.zip" "https://github.com/MoGLCL/CL/releases/download/v3.1/SWGE.zip"
+curl -L -o "%USERPROFILE%\Desktop\SWGE.zip" "https://github.com/MoGLCL/CL/releases/download/v3.2/SWGE.zip"
 
 if not exist "%USERPROFILE%\Desktop\SWGE.zip" (
     echo ❌ فشل التحميل.
@@ -20,5 +20,6 @@ rmdir /S /Q "%USERPROFILE%\Desktop\SWGE_TEMP"
 del "%USERPROFILE%\Desktop\SWGE.zip"
 
 echo ✅ تم الانتهاء.
+
 
 
